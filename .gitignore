@@ -1,0 +1,22 @@
+.emacs.d/backups/*
+.emacs.d/ac-comphist.dat
+.emacs.d/session*
+.emacs.d/eshell*
+.emacs.d/url*
+.emacs.d/ede-projects*
+.emacs.d/projectile-bookmarks*
+.emacs.d/auto-save-list/*
+.emacs.d/games/*-scores
+*.cache
+
+## EMACS
+*~
+\#*
+.\#*
+*.desktop
+*.lock
+
+## elisp compiled
+*.elc
+/.emacs.d/tramp
+/.emacs.d/nxhtml/etc/schema/xhtml-loader.rnc

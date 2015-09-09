@@ -1,0 +1,5 @@
+# cp -r .emacs* ~
+# ln -s ${pwd}/.emacs ~/.emacs
+ln -s `pwd`/.emacs.d ~/.emacs.d
+
+echo "Have M-x fun!"
