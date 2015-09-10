@@ -24,11 +24,11 @@
 
 (setq initial-scratch-message ";;# Scratch!
 ;;
+;;    M-s     'save-buffer
 ;;    M-a     'magit-status
 ;;    M-b     'magit-branch-manager
 ;;    M-[     'indent-region
 ;;    M-]     'indent-according-to-mode
-;;    M-s     'save-buffer
 ;;
 ;;    M-t     'ido-find-file
 ;;    M-p     'projectile-switch-project
@@ -44,6 +44,7 @@
 ;;    C-c t   'translate
 ;;
 ;;    howdoi
+;;    git-timemachine
 
 ")
 
