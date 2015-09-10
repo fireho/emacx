@@ -98,6 +98,8 @@
 (setq projectile-indexing-method 'native)
 (setq projectile-enable-caching t)
 
+(add-hook 'after-init-hook #'global-flycheck-mode)
+
 ;; Add color to a shell running in emacs 'M-x shell'
 ;; (require 'ansi-color)
 ;; (add-hook 'compilation-filter-hook 'ansi-color-for-comint-mode-on)
@@ -280,50 +282,6 @@
             (ruby-electric-mode t)
             ))
 
-;;; Rake
-;; (defun rake (task)
-;;   (interactive (list (completing-read "Rake (default: default): "
-;;                                       (pcmpl-rake-tasks))))
-;;   (shell-command-to-string (concat "rake " (if (= 0 (length task)) "default" task))))
-
-
-;; Clear the compilation buffer between test runs.
-(eval-after-load 'ruby-compilation
-  '(progn
-     (defadvice ruby-do-run-w/compilation (before kill-buffer (name cmdlist))
-       (let ((comp-buffer-name (format "*%s*" name)))
-         (when (get-buffer comp-buffer-name)
-           (with-current-buffer comp-buffer-name
-             (delete-region (point-min) (point-max))))))
-     (ad-activate 'ruby-do-run-w/compilation)))
-
-;; (add-hook 'ruby-mode-hook 'run-coding-hook)
-
-;;; Flymake
-
-(defun flymake-ruby-init ()
-  (let* ((temp-file (flymake-init-create-temp-buffer-copy
-                     'flymake-create-temp-inplace))
-         (local-file (file-relative-name
-                      temp-file
-                      (file-name-directory buffer-file-name))))
-    ;; Invoke ruby with '-c' to get syntax checking
-    (list "ruby" (list "-c" local-file))))
-
-(defun flymake-ruby-enable ()
-  (when (and buffer-file-name
-             (file-writable-p
-              (file-name-directory buffer-file-name))
-             (file-writable-p buffer-file-name)
-             ;;(if (fboundp 'tramp-list-remote-buffers)
-             ;;    (not (subsetp
-             ;;         (list (current-buffer))
-             ;;  (tramp-list-remote-buffers)))
-             t)
-    (local-set-key (kbd "C-c d")
-                   'flymake-display-err-menu-for-current-line)
-    (flymake-mode t)))
-
 
 ;;
 ;;
@@ -392,7 +350,6 @@
  '(debug-on-error nil)
  '(display-time-mode t)
  '(ecb-options-version "2.40")
- '(flymake-js-off t)
  '(fset (quote yes-or-no-p) t)
  '(inhibit-startup-screen t)
  '(menu-bar-mode nil)
