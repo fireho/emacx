@@ -323,19 +323,20 @@
 ;;   IDO Interactively Do Things
 ;;
 ;;
-(require 'ido)
 (ido-mode t)
                                         ;(setq ido-enable-flex-matching t)
 (setq ;; Use it for many file dialogs
  ido-everywhere t
+ flx-ido-mode t
  ido-case-fold t)  ;; Don’t be case sensitive
 ;;ido-use-filename-at-point t);; If the file at point exists, use that
 ;;ido-use-url-at-point t ;; Or if it is an URL…
-;; Even if TAB completes uniquely,;; still wait for RET
-;;ido-confirm-unique-completion t)
 ;; If the input does not exist,;; don’t look in unexpected places.
 ;; I probably want a new file.
 ;;ido-auto-merge-work-directories-length -3)
+;; disable ido faces to see flx highlights.
+(setq ido-enable-flex-matching t)
+;; (setq ido-use-faces nil)
 
 ;; EMACS WRITES HERE
 (custom-set-variables
@@ -349,7 +350,6 @@
  '(cua-mode t nil (cua-base))
  '(debug-on-error nil)
  '(display-time-mode t)
- '(ecb-options-version "2.40")
  '(fset (quote yes-or-no-p) t)
  '(inhibit-startup-screen t)
  '(menu-bar-mode nil)
