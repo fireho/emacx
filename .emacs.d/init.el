@@ -1,7 +1,7 @@
-;;
-;;
-;;
-;; Emacs for fun and profit !!
+;;; Emacxx --- Emacs custom configs
+;;;
+;;;
+;;; Emacs for fun and profit !!
 ;;
 ;;
 ;; User
@@ -132,7 +132,6 @@
 ;;   Requires!
 ;;
 (require 'paren) (show-paren-mode t)
-(require 'cheat)
 (require 'howdoi)
 
 ;; Webs
@@ -395,6 +394,7 @@
 ;;
 ;; Coffee-Script
 ;;
+;;
 ;; http://github.com/defunkt/coffee-mode.git
 (autoload 'coffee-mode "coffee-mode" "Major mode for editing coffee files." t)
 ;; http://cx4a.org/software/auto-complete/manual.html#Enable_auto-complete-mode_automatically_for_specific_modes
@@ -407,6 +407,7 @@
 ;;
 ;;
 ;; Findr!
+;;
 ;;
 (autoload 'findr "findr" "Find file name." t)
 (define-key global-map [(meta control S)] 'findr)
