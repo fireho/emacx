@@ -22,7 +22,7 @@ update 'Textile',        'https://github.com/emacsmirror/textile-mode/raw/master
 update 'Cheat.el',       'https://github.com/samsonjs/cheat.el/raw/master/cheat.el'
 update 'Markdown',       'https://github.com/defunkt/markdown-mode/raw/master/markdown-mode.el'
 update 'Cucumber',       'https://github.com/michaelklishin/cucumber.el/raw/master/feature-mode.el'
-update 'Textmate.el',    'https://github.com/defunkt/textmate.el/raw/master/textmate.el'
+# update 'Textmate.el',    'https://github.com/defunkt/textmate.el/raw/master/textmate.el'
 update 'CoffeeScript',   'https://github.com/nofxx/coffee-mode/raw/master/coffee-mode.el'
 update 'Recursive Find', 'https://github.com/nealford/emacs/raw/master/find-recursive.el'
 update 'howdoi',         'https://raw.githubusercontent.com/arthurnn/howdoi-emacs/master/howdoi.el'
@@ -37,7 +37,7 @@ update 'Ruby Inf',       'https://raw.githubusercontent.com/ruby/ruby/trunk/misc
 update 'Ruby db3x',      'https://raw.githubusercontent.com/ruby/ruby/trunk/misc/rubydb3x.el'
 update 'Ruby Add',       'https://raw.githubusercontent.com/ruby/ruby/trunk/misc/ruby-additional.el'
 update 'Ruby Hash',      'https://raw.githubusercontent.com/purcell/ruby-hash-syntax/master/ruby-hash-syntax.el'
-update 'Rubocop',        'https://raw.githubusercontent.com/bbatsov/rubocop-emacs/master/rubocop.el'
+# update 'Rubocop',        'https://raw.githubusercontent.com/bbatsov/rubocop-emacs/master/rubocop.el'
 
 # WEB
 update 'HTML',           'https://raw.githubusercontent.com/fxbois/web-mode/master/web-mode.el'

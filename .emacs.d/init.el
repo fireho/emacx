@@ -9,9 +9,7 @@
 ;; (add-to-list 'package-archives
 ;;              '("melpa" . "https://melpa.org/packages/"))
 
-(setq package-archives '(("gnu" . "http://elpa.gnu.org/packages/")
-                         ("marmalade" . "https://marmalade-repo.org/packages/")
-                         ("melpa" . "http://melpa.org/packages/")))
+(setq package-archives '(("melpa" . "http://melpa.org/packages/")))
 
 ;; Load Path
 (setq load-path
@@ -49,18 +47,18 @@
 ")
 
 
-(setq dotfiles-dir (file-name-directory
-                    (or (buffer-file-name) load-file-name)))
-(add-to-list 'load-path dotfiles-dir)
-(add-to-list 'load-path "/usr/share/emacs/site-lisp/ecb")
+;; (setq dotfiles-dir (file-name-directory
+;;                     (or (buffer-file-name) load-file-name)))
+;; (add-to-list 'load-path dotfiles-dir)
+;; (add-to-list 'load-path "/usr/share/emacs/site-lisp/ecb")
 
 ;;
 ;;
 ;; SO Detection
-(setq macosx-p (string-match "darwin" (symbol-name system-type)))
-(setq linux-p (string-match "linux" (symbol-name system-type)))
-(if macosx-p   (require 'osx))
-(if linux-p    (require 'linux))
+;; (setq macosx-p (string-match "darwin" (symbol-name system-type)))
+;; (setq linux-p (string-match "linux" (symbol-name system-type)))
+;; (if macosx-p   (require 'osx))
+;; (if linux-p    (require 'linux))
 
 (server-start)
 
@@ -161,7 +159,7 @@
 
 ;; GIT
 ;;
-(autoload 'magit-status "magit" nil t)
+;; (autoload 'magit-status "magit" nil t)
 
 ;; Markdown
 ;;
@@ -181,21 +179,21 @@
 ;;
 (set-face-background 'vertical-border "white")
 (set-face-foreground 'vertical-border "white")
+ 
+;; ;; change magit diff colors
+;; (eval-after-load 'magit
+;;   '(progn
+;;      (set-face-foreground 'magit-diff-add "green3")
+;;      (set-face-foreground 'magit-diff-del "red3")
+;;      (when (not window-system)
+;;        (set-face-background 'magit-item-highlight "black"))))
 
-;; change magit diff colors
-(eval-after-load 'magit
-  '(progn
-     (set-face-foreground 'magit-diff-add "green3")
-     (set-face-foreground 'magit-diff-del "red3")
-     (when (not window-system)
-       (set-face-background 'magit-item-highlight "black"))))
-
-(add-to-list 'auto-mode-alist '("COMMIT_EDITMSG$" . diff-mode))
-(eval-after-load 'diff-mode
-  '(progn
-     (set-face-foreground 'diff-added "green4")
-     (set-face-foreground 'diff-removed "red3")))
-
+;; (add-to-list 'auto-mode-alist '("COMMIT_EDITMSG$" . diff-mode))
+;; (eval-after-load 'diff-mode
+;;   '(progn
+;;      (set-face-foreground 'diff-added "green4")
+;;      (set-face-foreground 'diff-removed "red3")))
+ 
 ;;
 ;; Color Theme and fonts
 (require 'color-theme)
@@ -310,9 +308,9 @@
 (add-hook 'sass-mode-hook 'progmodes-hooks)
 (add-hook 'js2-mode-hook 'progmodes-hooks)
 
-;; Law & Order
-(require 'rubocop)
-(add-hook 'ruby-mode-hook 'rubocop-mode)
+;; ;; Law & Order
+;; (require 'rubocop)
+;; (add-hook 'ruby-mode-hook 'rubocop-mode)
 
 
 
