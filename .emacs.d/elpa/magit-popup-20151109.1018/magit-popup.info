@@ -582,7 +582,8 @@ commands have to be defined separately using plain ‘defun’.
         • ‘:sequence-predicate’
 
           When this function returns non-nil, then the popup uses
-          ‘:sequence-actions’ instead of ‘:actions’.
+          ‘:sequence-actions’ instead of ‘:actions’, and does not show
+          the ‘:switches’ and ‘:options’.
 
         • ‘:sequence-actions’
 
@@ -654,7 +655,7 @@ Node: Customizing existing popups9392
 Node: Other options13961
 Node: Defining prefix and suffix commands15667
 Node: Defining prefix commands17819
-Node: Defining suffix commands23826
+Node: Defining suffix commands23894
 
 End Tag Table
 
