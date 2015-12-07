@@ -160,6 +160,7 @@
 ;; GIT
 ;;
 ;; (autoload 'magit-status "magit" nil t)
+(setq magit-push-always-verify nil)
 
 ;; Markdown
 ;;
@@ -179,7 +180,7 @@
 ;;
 (set-face-background 'vertical-border "white")
 (set-face-foreground 'vertical-border "white")
- 
+
 ;; ;; change magit diff colors
 ;; (eval-after-load 'magit
 ;;   '(progn
@@ -193,7 +194,7 @@
 ;;   '(progn
 ;;      (set-face-foreground 'diff-added "green4")
 ;;      (set-face-foreground 'diff-removed "red3")))
- 
+
 ;;
 ;; Color Theme and fonts
 (require 'color-theme)
