@@ -269,6 +269,12 @@
      (define-key ruby-mode-map (kbd "M-/") 'ruby-toggle-string<>simbol)
      (define-key ruby-mode-map (kbd "C-c l") "lambda")))
 
+
+;; work around magit key changes
+(eval-after-load 'magit-mode
+  '(progn
+     (define-key magit-mode-map (kbd "M-w") 'ido-switch-buffer)))
+
 ;; (global-set-key (kbd "C-h r") 'ri)
 ;; We never want to edit Rubinius bytecode
 (add-to-list 'completion-ignored-extensions ".rbc")
