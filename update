@@ -47,7 +47,7 @@ update 'SLIM Mode',      'https://raw.github.com/slim-template/emacs-slim/master
 update 'HAML Mode',      'https://github.com/nex3/haml-mode/raw/master/haml-mode.el'
 update 'SASS Mode',      'https://github.com/nex3/sass-mode/raw/master/sass-mode.el'
 update 'SCSS Mode',      'https://github.com/antonj/scss-mode/raw/master/scss-mode.el'
-update 'Findr.el',       'http://www.emacswiki.org/emacs/download/findr.el'
+# update 'Findr.el',       'http://www.emacswiki.org/emacs/download/findr.el'
 
 update 'Yasnippet',      'https://raw.githubusercontent.com/capitaomorte/yasnippet/master/yasnippet.el'
 # update 'Lua',           'http://luaforge.net/frs/download.php/4628/lua-mode.el'

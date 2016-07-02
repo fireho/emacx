@@ -5,6 +5,7 @@
 ;; Author: David Bakhash <cadet@bu.edu>
 ;; Maintainer: David Bakhash <cadet@bu.edu>
 ;; Version: 0.9.11
+;; Package-Version: 20130824.507
 ;; Created: Tue Jul 27 12:49:22 EST 1999
 ;; Keywords: files
 
