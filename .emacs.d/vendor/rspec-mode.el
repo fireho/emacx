@@ -29,7 +29,7 @@
 ;; contexts of RSpec specifications.  Refer to the README for a
 ;; summary of keybindings and their descriptions.
 ;;
-;; You can choose whether to run specs using 'rake spec' or the 'spec'
+;; You can choose whether to run specs using 'rake spec' or the 'rspec'
 ;; command. Use the customization interface (customize-group
 ;; rspec-mode) or override using (setq rspec-use-rake-when-possible TVAL).
 ;;
@@ -51,6 +51,8 @@
 ;;
 ;;; Change Log:
 ;;
+;; 1.14 - Add option to run spec commands in a Vagrant box through
+;;        "vagrant ssh -c".
 ;; 1.13 - Add a variable to autosave current buffer where it makes sense
 ;; 1.12 - Run specs for single method (Renan Ranelli)
 ;; 1.11 - Switching between method, its specs and back (Renan Ranelli)
@@ -116,11 +118,11 @@
   "RSpec minor mode."
   :group 'languages)
 
-(defcustom rspec-use-rake-when-possible t
+(defcustom rspec-use-rake-when-possible nil
   "When non-nil and Rakefile is present, run specs via rake spec task."
   :tag "RSpec runner command"
   :type '(radio (const :tag "Use 'rake spec' task" t)
-                (const :tag "Use 'spec' command" nil))
+                (const :tag "Use 'rspec' command" nil))
   :group 'rspec-mode)
 
 (define-obsolete-variable-alias 'rspec-use-rake-flag
@@ -141,9 +143,19 @@
   :type 'boolean
   :group 'rspec-mode)
 
+(defcustom rspec-vagrant-cwd "/vagrant/"
+  "Working directory when running inside Vagrant. Use trailing slash."
+  :type 'string
+  :group 'rspec-mode)
+
 (defcustom rspec-use-bundler-when-possible t
   "When t and Gemfile is present, run specs with 'bundle exec'.
 Not used when running specs using Zeus or Spring."
+  :type 'boolean
+  :group 'rspec-mode)
+
+(defcustom rspec-use-vagrant-when-possible nil
+  "When t and Vagrant file is present, run specs inside Vagrant box using 'vagrant ssh -c'."
   :type 'boolean
   :group 'rspec-mode)
 
@@ -209,7 +221,8 @@ for spec files corresponding to files inside them."
 
 (defcustom rspec-autosave-buffer nil
   "If t save the current buffer when running
-`rspec-verify', `rspec-verify-single', `rspec-verify-matching' & `rspec-verify-continue'."
+`rspec-verify', `rspec-verify-single', `rspec-verify-matching',
+`rspec-verify-continue' & `rspec-run-last-failed'."
   :type 'boolean
   :group 'rspec-mode)
 
@@ -358,6 +371,7 @@ for spec files corresponding to files inside them."
 (defun rspec-run-last-failed ()
   "Run just the specs that failed during the last invocation."
   (interactive)
+  (rspec--autosave-buffer-maybe)
   (rspec-run-multiple-files rspec-last-failed-specs (rspec-core-options)))
 
 (defun rspec-verify-continue ()
@@ -491,25 +505,32 @@ to navigate to the example or method corresponding to point."
 
 (defun rspec-target-file-for (a-spec-file-name)
   "Find the target for A-SPEC-FILE-NAME."
-  (cl-loop for dir in (cons "." rspec-primary-source-dirs)
-           for target = (replace-regexp-in-string
-                         "/spec/"
-                         (concat "/" dir "/")
-                         (rspec-targetize-file-name a-spec-file-name))
-           if (file-exists-p target)
-           return target))
+  (cl-loop for extension in (list "rb" "rake")
+           for candidate = (rspec-targetize-file-name a-spec-file-name
+                                                       extension)
+           for filename = (cl-loop for dir in (cons "."
+                                                    rspec-primary-source-dirs)
+                                   for target = (replace-regexp-in-string
+                                                 "/spec/"
+                                                 (concat "/" dir "/")
+                                                 candidate)
+                                   if (file-exists-p target)
+                                   return target)
+           if filename
+           return filename))
 
 (defun rspec-specize-file-name (a-file-name)
   "Return A-FILE-NAME but converted in to a spec file name."
   (concat
    (file-name-directory a-file-name)
-   (replace-regexp-in-string "\\(\\.rb\\)?$" "_spec.rb" (file-name-nondirectory a-file-name))))
+   (replace-regexp-in-string "\\(\\.\\(rb\\|rake\\)\\)?$" "_spec.rb" (file-name-nondirectory a-file-name))))
 
-(defun rspec-targetize-file-name (a-file-name)
-  "Return A-FILE-NAME but converted into a non-spec file name."
+(defun rspec-targetize-file-name (a-file-name extension)
+  "Return A-FILE-NAME but converted into a non-spec file name with EXTENSION."
   (concat (file-name-directory a-file-name)
           (rspec-file-name-with-default-extension
-           (replace-regexp-in-string "_spec\\.rb" "" (file-name-nondirectory a-file-name)))))
+           (replace-regexp-in-string "_spec\\.rb" (concat "." extension)
+                                     (file-name-nondirectory a-file-name)))))
 
 (defun rspec-file-name-with-default-extension (a-file-name)
   "Add .rb file extension to A-FILE-NAME if it does not already have an extension."
@@ -570,12 +591,16 @@ to navigate to the example or method corresponding to point."
 file if it exists, or sensible defaults otherwise."
   (cond ((and rspec-use-opts-file-when-available
               (file-readable-p (rspec-spec-opts-file)))
-         (concat "--options " (shell-quote-argument (rspec-spec-opts-file))))
+         (concat "--options " (rspec--shell-quote-local (rspec-spec-opts-file))))
         (t rspec-command-options)))
 
 (defun rspec-bundle-p ()
   (and rspec-use-bundler-when-possible
        (file-readable-p (concat (rspec-project-root) "Gemfile"))))
+
+(defun rspec-vagrant-p ()
+  (and rspec-use-vagrant-when-possible
+       (file-readable-p (concat (rspec-project-root) "Vagrantfile"))))
 
 (defun rspec-zeus-file-path ()
   (or (getenv "ZEUSSOCK")
@@ -601,9 +626,13 @@ file if it exists, or sensible defaults otherwise."
           ;; 0.9.2+
           (file-exists-p (format "%s/spring/%s.pid" temporary-file-directory (md5 root)))
           ;; 1.2.0+
-          (let ((path (or (getenv "XDG_RUNTIME_DIR") temporary-file-directory))
-                (ruby-version (shell-command-to-string "ruby -e 'print RUBY_VERSION'")))
-            (file-exists-p (format "%s/spring/%s.pid" path (md5 (concat ruby-version root)))))))))
+          (let* ((path (or (getenv "XDG_RUNTIME_DIR") temporary-file-directory))
+                 (ruby-version (shell-command-to-string "ruby -e 'print RUBY_VERSION'"))
+                 (application-id (md5 (concat ruby-version root))))
+            (or
+             (file-exists-p (format "%s/spring/%s.pid" path application-id))
+             ;; 1.5.0+
+             (file-exists-p (format "%s/spring-%s/%s.pid" path (user-real-uid) application-id))))))))
 
 (defun rspec2-p ()
   (or (string-match "rspec" rspec-spec-command)
@@ -614,6 +643,23 @@ file if it exists, or sensible defaults otherwise."
   (if (rspec2-p)
       (expand-file-name ".rspec" (rspec-project-root))
     (expand-file-name "spec.opts" (rspec-spec-directory (rspec-project-root)))))
+
+(defun rspec--shell-quote-local (file)
+  (let ((remote (file-remote-p file))
+        (vagrant (rspec-vagrant-p)))
+    (shell-quote-argument
+     (cond
+      (remote (substring file (length remote)))
+      (vagrant (replace-regexp-in-string (regexp-quote (rspec-project-root))
+                                         rspec-vagrant-cwd file))
+      (t  file)))))
+
+(defun rspec--vagrant-wrapper (command)
+  (if (rspec-vagrant-p)
+      (format "vagrant ssh -c 'cd %s; %s'"
+              (shell-quote-argument rspec-vagrant-cwd)
+              command)
+    command))
 
 (defun rspec-runner ()
   "Return command line to run rspec."
@@ -643,11 +689,11 @@ or a cons (FILE . LINE), to run one example."
     (concat (when use-rake "SPEC=\'")
             (if (listp target)
                 (if (listp (cdr target))
-                    (mapconcat #'shell-quote-argument target " ")
-                  (concat (shell-quote-argument (car target))
+                    (mapconcat #'rspec--shell-quote-local target " ")
+                  (concat (rspec--shell-quote-local (car target))
                           ":"
                           (cdr target)))
-              (shell-quote-argument target))
+              (rspec--shell-quote-local target))
             (when use-rake "\'"))))
 
 ;;;###autoload
@@ -698,9 +744,10 @@ or a cons (FILE . LINE), to run one example."
       (rvm-activate-corresponding-ruby))
 
   (let ((default-directory (or (rspec-project-root) default-directory)))
-    (compile (mapconcat 'identity `(,(rspec-runner)
-                                    ,(rspec-runner-options opts)
-                                    ,target) " ")
+    (compile (rspec--vagrant-wrapper
+              (mapconcat 'identity `(,(rspec-runner)
+                                     ,(rspec-runner-options opts)
+                                     ,target) " "))
              'rspec-compilation-mode)))
 
 (defvar rspec-compilation-mode-font-lock-keywords
@@ -713,8 +760,8 @@ or a cons (FILE . LINE), to run one example."
      (1 compilation-error-face))))
 
 (defvar rspec-compilation-error-regexp-alist-alist
-  '((rspec-capybara-html "Saved file \\([0-9A-Za-z@_./\:-]+\\.html\\)" 1 nil nil 0 1)
-    (rspec-capybara-screenshot "Screenshot: \\([0-9A-Za-z@_./\:-]+\\.png\\)" 1 nil nil 0 1)
+  '((rspec-capybara-html "screenshot: file://\\([0-9A-Za-z@_./\:-]+\\.html\\)" 1 nil nil 0 1)
+    (rspec-capybara-screenshot "screenshot: file://\\([0-9A-Za-z@_./\:-]+\\.png\\)" 1 nil nil 0 1)
     (rspec "^ +# \\([0-9A-Za-z@_./:-]+\\.rb\\):\\([0-9]+\\):in" 1 2 nil 2 1)
     (rspec-pendings "^ +# \\([0-9A-Za-z@_./:-]+\\.rb\\):\\([0-9]+\\)" 1 2 nil 1 1)
     (rspec-summary "^rspec \\([0-9A-Za-z@_./:-]+\\.rb\\):\\([0-9]+\\)" 1 2 nil 2 1)))
