@@ -67,7 +67,7 @@
 (setq user-mail-address "user@user.com")
 (setq visible-bell 'top-bottom)
 (setq-default truncate-lines t)
-(setq warning-minimum-level :error)
+;;(setq warning-minimum-level :error)
 (setq truncate-partial-width-windows nil) ;; for vertically-split windows
 (setq x-select-enable-clipboard t) ;; make emacs use the clipboard
 (global-linum-mode)
@@ -84,7 +84,7 @@
 ;; (setq backup-directory-alist `(("." . "~/.saves")))
 ;; (setq backup-by-copying t)
 (setq backup-inhibited t)
-(setq make-backup-file nil)
+;;(setq make-backup-file nil)
 (setq create-lockfiles nil)
 ;; (setq backup-by-copying t               ; don't clobber symlinks
 ;;       delete-old-versions t
@@ -351,7 +351,6 @@
  '(auto-save-interval 9999)
  '(auto-save-timeout 9999)
  '(blink-cursor-mode nil)
- '(cua-mode t nil (cua-base))
  '(debug-on-error nil)
  '(display-time-mode t)
  '(fset (quote yes-or-no-p) t)
@@ -367,7 +366,6 @@
 ;;'(twit-pass "")
 ;;'(twit-user ""))
 ;;'(auto-save-visited-file-name t)
-;; '(cua-mode t nil (cua-base))
 
 ;; Byte compile ~/.emacs.d
 (defun byte-recompile-home ()
@@ -422,7 +420,6 @@
 
 (autoload 'findr-query-replace "findr" "Replace text in files." t)
 (define-key global-map [(meta control r)] 'findr-query-replace)
-
 
 (cua-mode t)
 (setq cua-auto-tabify-rectangles nil)
