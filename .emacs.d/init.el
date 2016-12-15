@@ -356,6 +356,9 @@
  '(fset (quote yes-or-no-p) t)
  '(inhibit-startup-screen t)
  '(menu-bar-mode nil)
+ '(package-selected-packages
+	 (quote
+		(coffee-mode haml-mode rubocop rainbow-mode projectile powerline paradox magit google-translate git-timemachine flycheck flx-ido findr elixir-mode auto-complete)))
  '(rails-indent-and-complete nil)
  '(safe-local-variable-values (quote ((encoding . utf-8))))
  '(save-abbrevs (quote silently))
