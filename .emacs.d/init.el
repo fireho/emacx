@@ -10,6 +10,7 @@
 (require 'package) ;; You might already have this line
 ;; (add-to-list 'package-archives
 ;;              '("melpa" . "https://melpa.org/packages/"))
+;;; Code:
 
 (setq package-archives '(("melpa" . "http://melpa.org/packages/")))
 
@@ -47,12 +48,6 @@
 ;;    git-timemachine
 
 ")
-
-
-;; (setq dotfiles-dir (file-name-directory
-;;                     (or (buffer-file-name) load-file-name)))
-;; (add-to-list 'load-path dotfiles-dir)
-;; (add-to-list 'load-path "/usr/share/emacs/site-lisp/ecb")
 
 ;;
 ;;
@@ -132,22 +127,16 @@
 (require 'whitespace)
 (setq whitespace-style '(face empty tabs lines-tail trailing space-before-tab))
 (global-whitespace-mode t)
-;; (powerline-default-theme)
-;; (setq whitespace-line-count 80 whitespace-style '(lines))
-;; '(whitespace-global-modes (quote (ruby-mode emacs-lisp-mode scheme-mode enh-ruby-mode c-mode racket-mode sml-mode)))
 
 ;;
 ;;
 ;;   Requires!
 ;;
 (require 'paren) (show-paren-mode t)
-(require 'howdoi)
 
 ;; Webs
-(require 'web-mode)
-(require 'yasnippet)
-(setq yas-snippet-dirs '("~/.emacs.d/snippets"))
-(yas-global-mode 1)
+;; (setq yas-snippet-dirs '("~/.emacs.d/snippets"))
+;; (yas-global-mode 1)
 
 
 (add-to-list 'auto-mode-alist '("\\.mm\\'" . objc-mode))
@@ -218,10 +207,6 @@
   (tooltip-mode -1)
   (mouse-wheel-mode t)
   (blink-cursor-mode -1))
-
-;; multi-occur cool!
-(eval-when-compile
-  (require 'cl))
 
 (defun get-buffers-matching-mode (mode)
   "Returns a list of buffers where their major-mode is equal to MODE"
@@ -297,17 +282,17 @@
 ;; LINT
 ;;
 (defun untabify-buffer ()
- "Untabify current buffer"
+ "Untabify current buffer."
  (interactive)
  (untabify (point-min) (point-max)))
 
 (defun progmodes-hooks ()
-  "Hooks for programming modes"
+  "Hooks for programming modes."
   (setq truncate-lines t)
   (add-hook 'before-save-hook 'progmodes-write-hooks))
 
 (defun progmodes-write-hooks ()
-  "Hooks which run on file write for programming modes"
+  "Hooks which run on file write for programming modes."
   (prog1 nil
     (set-buffer-file-coding-system 'utf-8-unix)
     (untabify-buffer)
@@ -365,9 +350,9 @@
  '(menu-bar-mode nil)
  '(package-selected-packages
 	 '(## auto-complete coffee-mode copilot dumb-jump elixir-mode findr
-				flx-ido flycheck git-timemachine google-translate gptel
-				haml-mode magit paradox powerline projectile rainbow-mode
-				rspec-mode rubocop vue-mode))
+				flx-ido flycheck git-timemachine gptel haml-mode ligature
+				magit paradox powerline projectile rainbow-mode rspec-mode
+				rubocop rust-mode vue-mode))
  '(rails-indent-and-complete nil)
  '(safe-local-variable-values '((encoding . utf-8)))
  '(save-abbrevs 'silently)
@@ -381,6 +366,7 @@
 
 ;; Byte compile ~/.emacs.d
 (defun byte-recompile-home ()
+  "Compile all files on ~/.emacs.d."
   (interactive)
   (byte-recompile-directory "~/.emacs.d" 0))
 
@@ -403,19 +389,6 @@
                                         ; add to ruby mode hook:
 ;;(define-key ruby-mode-map "\C-c\C-s" 'autotest-switch)
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;
-;; Coffee-Script
-;;
-;;
-;; http://github.com/defunkt/coffee-mode.git
-(autoload 'coffee-mode "coffee-mode" "Major mode for editing coffee files." t)
-;; http://cx4a.org/software/auto-complete/manual.html#Enable_auto-complete-mode_automatically_for_specific_modes
-
-(add-to-list 'auto-mode-alist '("\\.coffee$" . coffee-mode))
-(add-to-list 'auto-mode-alist '("Cakefile" . coffee-mode))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -492,6 +465,7 @@
 (global-set-key "\M-[" 'indent-region)
 (global-set-key "\M-]" 'indent-according-to-mode)
 (global-set-key "\M-s" 'save-buffer)
+(global-set-key "\M-d" 'gptel-send)
 
 (global-set-key "\M-t" 'ido-find-file)
 (global-set-key "\M-p" 'projectile-switch-project)
@@ -568,8 +542,8 @@
 ;;
 ;; Monaco Inconsolata Hack
 ;;
-(set-face-attribute 'default nil :font  "Hack Nerd Font Mono-14" )
-(set-frame-font   "Hack Nerd Font Mono-14" nil t)
+(set-face-attribute 'default nil :font  "FiraCode Nerd Font Mono 10" )
+;; (set-frame-font   "Hack Nerd Font Mono-14" nil t)
 
 
 (let ((path (shell-command-to-string ". ~/.zshrc; echo -n $PATH")))
@@ -611,6 +585,36 @@
 (my-keys-minor-mode 1)
 
 ;; OPTIONAL configuration gptel-model 'claude-3.7-sonnet
-(setq gptel-backend (gptel-make-gh-copilot "Copilot"))
+;; (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
+(setq gptel-backend (gptel-make-gpt4all "GPT4All"           ;Name of your choosing
+                      :protocol "http"
+                      :host "localhost:1234"                 ;Where it's running
+                      :models '(Yi-Coder-9B-Chat-Q4_K_M.gguf))) ;Available mod
+
+(use-package ligature
+  :config
+  ;; Enable the "www" ligature in every possible major mode
+  (ligature-set-ligatures 't '("www"))
+  ;; Enable traditional ligature support in eww-mode, if the
+  ;; `variable-pitch' face supports it
+  (ligature-set-ligatures 'eww-mode '("ff" "fi" "ffi"))
+  ;; Enable all Cascadia Code ligatures in programming modes
+  (ligature-set-ligatures 'prog-mode '("|||>" "<|||" "<==>" "<!--" "####" "~~>" "***" "||=" "||>"
+                                       ":::" "::=" "=:=" "===" "==>" "=!=" "=>>" "=<<" "=/=" "!=="
+                                       "!!." ">=>" ">>=" ">>>" ">>-" ">->" "->>" "-->" "---" "-<<"
+                                       "<~~" "<~>" "<*>" "<||" "<|>" "<$>" "<==" "<=>" "<=<" "<->"
+                                       "<--" "<-<" "<<=" "<<-" "<<<" "<+>" "</>" "###" "#_(" "..<"
+                                       "..." "+++" "/==" "///" "_|_" "www" "&&" "^=" "~~" "~@" "~="
+                                       "~>" "~-" "**" "*>" "*/" "||" "|}" "|]" "|=" "|>" "|-" "{|"
+                                       "[|" "]#" "::" ":=" ":>" ":<" "$>" "==" "=>" "!=" "!!" ">:"
+                                       ">=" ">>" ">-" "-~" "-|" "->" "--" "-<" "<~" "<*" "<|" "<:"
+                                       "<$" "<=" "<>" "<-" "<<" "<+" "</" "#{" "#[" "#:" "#=" "#!"
+                                       "##" "#(" "#?" "#_" "%%" ".=" ".-" ".." ".?" "+>" "++" "?:"
+                                       "?=" "?." "??" ";;" "/*" "/=" "/>" "//" "__" "~~" "(*" "*)"
+                                       "\\\\" "://"))
+  ;; Enables ligature checks globally in all buffers.  You can also do it
+  ;; per mode with `ligature-mode'.
+  (global-ligature-mode t))
+
 
 ;;; init.el ends here

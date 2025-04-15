@@ -8,8 +8,8 @@
 ;; Homepage: https://github.com/magit/magit
 ;; Keywords: tools
 
-;; Package-Version: 20250401.1753
-;; Package-Revision: bf58615a033b
+;; Package-Version: 20250415.810
+;; Package-Revision: 1762e7f3d96a
 ;; Package-Requires: (
 ;;     (emacs "27.1")
 ;;     (compat "30.0.2.0")
@@ -1077,8 +1077,10 @@ SECTION's body (and heading) obviously cannot be visible."
 
 (defun magit-section-show-level (level)
   "Show surrounding sections up to LEVEL.
-If LEVEL is negative, show up to the absolute value.
-Sections at higher levels are hidden."
+Likewise hide sections at higher levels.  If the region selects multiple
+sibling sections, act on all marked trees.  If LEVEL is negative, show
+all sections up to the absolute value of that, not just surrounding
+sections."
   (if (< level 0)
       (let ((s (magit-current-section)))
         (setq level (- level))
@@ -1086,13 +1088,15 @@ Sections at higher levels are hidden."
           (setq s (oref s parent))
           (goto-char (oref s start)))
         (magit-section-show-children magit-root-section (1- level)))
-    (cl-do* ((s (magit-current-section)
-                (oref s parent))
-             (i (1- (length (magit-section-ident s)))
-                (cl-decf i)))
-        ((cond ((< i level) (magit-section-show-children s (- level i 1)) t)
-               ((= i level) (magit-section-hide s) t))
-         (magit-section-goto s)))))
+    (dolist (section (or (magit-region-sections)
+                         (list (magit-current-section))))
+      (cl-do* ((s section
+                  (oref s parent))
+               (i (1- (length (magit-section-ident s)))
+                  (cl-decf i)))
+          ((cond ((< i level) (magit-section-show-children s (- level i 1)) t)
+                 ((= i level) (magit-section-hide s) t))
+           (magit-section-goto s))))))
 
 (defun magit-section-show-level-1 ()
   "Show surrounding sections on first level."
