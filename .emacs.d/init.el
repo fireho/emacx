@@ -145,12 +145,6 @@
 
 ;; Webs
 (require 'web-mode)
-(require 'slim-mode)
-(require 'haml-mode)
-(require 'sass-mode)
-;;(require 'scss-mode)
-;;(require 'less-css-mode)
-
 (require 'yasnippet)
 (setq yas-snippet-dirs '("~/.emacs.d/snippets"))
 (yas-global-mode 1)
@@ -370,10 +364,10 @@
  '(inhibit-startup-screen t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-   '(## auto-complete coffee-mode copilot dumb-jump elixir-mode findr
-        flx-ido flycheck git-timemachine google-translate gptel
-        haml-mode magit paradox powerline projectile rainbow-mode
-        rubocop vue-mode))
+	 '(## auto-complete coffee-mode copilot dumb-jump elixir-mode findr
+				flx-ido flycheck git-timemachine google-translate gptel
+				haml-mode magit paradox powerline projectile rainbow-mode
+				rspec-mode rubocop vue-mode))
  '(rails-indent-and-complete nil)
  '(safe-local-variable-values '((encoding . utf-8)))
  '(save-abbrevs 'silently)

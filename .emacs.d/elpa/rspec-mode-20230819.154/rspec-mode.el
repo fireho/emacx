@@ -1,10 +1,11 @@
-;;; rspec-mode.el --- Enhance ruby-mode for RSpec
+;;; rspec-mode.el --- Enhance ruby-mode for RSpec -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2008-2015 Peter Williams <http://barelyenough.org> and others
 ;; Author: Peter Williams, et al.
 ;; URL: http://github.com/pezra/rspec-mode
 ;; Created: 2011
-;; Version: 1.15
+;; Package-Version: 20230819.154
+;; Package-Revision: 29df3d081c6a
 ;; Keywords: rspec ruby
 ;; Package-Requires: ((ruby-mode "1.0") (cl-lib "0.4"))
 
@@ -51,6 +52,13 @@
 ;;
 ;;; Change Log:
 ;;
+;; 1.21 - New option `rspec-docker-file-name'.
+;; 1.20 - Fix a regression of `rspec-run-last-failed'
+;; 1.19 - Fix bugs about change of buffer naming
+;; 1.18 - Add `rspec-before-verification-hook' and `rspec-after-verification-hook'
+;;        hooks
+;; 1.17 - Support for running multiple rspec processes at once
+;; 1.16 - Add `rspec-yank-last-command' function (Sergiy Kukunin)
 ;; 1.15 - Add option to run spec commands in a Docker container
 ;;        through "docker exec".
 ;; 1.14 - Add option to run spec commands in a Vagrant box through
@@ -77,7 +85,7 @@
 ;; 0.7 - follow RoR conventions for file in lib directory (Tim Harper)
 ;; 0.6 - support for arbitrary spec and rake commands (David Yeu)
 ;; 0.5 - minor changes from Tim Harper
-;; 0.4 - ansi colorization of compliation buffers (teaforthecat)
+;; 0.4 - ansi colorization of compilation buffers (teaforthecat)
 ;; 0.3 - Dave Nolan implements respect for spec.opts config and
 ;;       custom option to use 'rake spec' task or 'spec' command
 ;; 0.2 - Tim Harper implemented support for imenu to generate a basic
@@ -90,7 +98,9 @@
 (require 'compile)
 (require 'cl-lib)
 
+(defvar rspec-verifiable-mode-keymap)
 (define-prefix-command 'rspec-verifiable-mode-keymap)
+(defvar rspec-mode-keymap)
 (define-prefix-command 'rspec-mode-keymap)
 
 (define-key rspec-verifiable-mode-keymap (kbd "v") 'rspec-verify)
@@ -100,6 +110,7 @@
 (define-key rspec-verifiable-mode-keymap (kbd "4 t") 'rspec-find-spec-or-target-other-window)
 (define-key rspec-verifiable-mode-keymap (kbd "4 e") 'rspec-find-spec-or-target-find-example-other-window)
 (define-key rspec-verifiable-mode-keymap (kbd "r") 'rspec-rerun)
+(define-key rspec-verifiable-mode-keymap (kbd "y") 'rspec-yank-last-command)
 (define-key rspec-verifiable-mode-keymap (kbd "m") 'rspec-verify-matching)
 (define-key rspec-verifiable-mode-keymap (kbd "c") 'rspec-verify-continue)
 (define-key rspec-verifiable-mode-keymap (kbd "s") 'rspec-verify-method)
@@ -110,6 +121,7 @@
 (define-key rspec-mode-keymap (kbd "s") 'rspec-verify-single)
 (define-key rspec-mode-keymap (kbd "d") 'rspec-toggle-example-pendingness)
 
+(defvar rspec-dired-mode-keymap)
 (define-prefix-command 'rspec-dired-mode-keymap)
 (define-key rspec-dired-mode-keymap (kbd "v") 'rspec-dired-verify)
 (define-key rspec-dired-mode-keymap (kbd "s") 'rspec-dired-verify-single)
@@ -127,9 +139,6 @@
                 (const :tag "Use 'rspec' command" nil))
   :group 'rspec-mode)
 
-(define-obsolete-variable-alias 'rspec-use-rake-flag
-  'rspec-use-rake-when-possible "1.7")
-
 (defcustom rspec-rake-command "rake"
   "The command for rake."
   :type 'string
@@ -145,49 +154,90 @@
   :type 'boolean
   :group 'rspec-mode)
 
+(defcustom rspec-use-chruby nil
+  "When t, use chruby. Requires chruby.el."
+  :type 'boolean
+  :group 'rspec-mode)
+
+(defvar rspec--docker-commands
+  '("docker exec"
+    "docker run"
+    "docker-compose exec"
+    "docker-compose run"
+    "nerdctl compose exec"
+    "nerdctl compose run"
+    "nerdctl exec"
+    "nerdctl run"
+    "podman exec"
+    "podman run"
+    "podman-compose exec"
+    "podman-compose run")
+  "List of acceptable docker commands to use.")
+
 (defcustom rspec-docker-command "docker-compose run"
   "Docker command to run."
   :type 'string
-  :group 'rspec-mode)
+  :group 'rspec-mode
+  :safe (lambda (value)
+          (member value rspec--docker-commands)))
 
 (defcustom rspec-docker-container "rspec-container-name"
   "Name of the docker container to run rspec in."
   :type 'string
-  :group 'rspec-mode)
+  :group 'rspec-mode
+  :safe 'stringp)
 
 (defcustom rspec-docker-cwd "/app/"
   "Working directory when running inside Docker.  Use trailing slash."
   :type 'string
   :group 'rspec-mode)
 
+(defcustom rspec-docker-wrapper-fn 'rspec--docker-default-wrapper
+  "Function for wrapping a command for execution inside a dockerized environment."
+  :type 'function
+  :group 'rspec-mode)
+
+(defcustom rspec-docker-file-name "docker-compose.yml"
+  "File name to look for to determine whether to use Docker."
+  :type 'string
+  :group 'rspec-mode
+  :safe 'stringp)
+
 (defcustom rspec-vagrant-cwd "/vagrant/"
   "Working directory when running inside Vagrant. Use trailing slash."
   :type 'string
   :group 'rspec-mode)
 
+(defcustom rspec-use-relative-path nil
+  "When t the file path will be relative."
+  :type 'boolean
+  :group 'rspec-mode)
+
 (defcustom rspec-use-bundler-when-possible t
-  "When t and Gemfile is present, run specs with 'bundle exec'.
+  "When t and Gemfile is present, run specs with `bundle exec'.
 Not used when running specs using Zeus or Spring."
   :type 'boolean
   :group 'rspec-mode)
 
 (defcustom rspec-use-docker-when-possible nil
-  "When t and Dockerfile is present, run specs inside Docker container using 'docker exec'."
+  "When t and a file `rspec-docker-file-name' exists, run specs inside Docker.
+The command that will be used is defined by `rspec-docker-command'."
   :type 'boolean
   :group 'rspec-mode)
 
 (defcustom rspec-use-vagrant-when-possible nil
-  "When t and Vagrant file is present, run specs inside Vagrant box using 'vagrant ssh -c'."
+  "When t and Vagrant file is present, run specs inside Vagrant box.
+Use shell command `vagrant ssh -c'."
   :type 'boolean
   :group 'rspec-mode)
 
 (defcustom rspec-use-zeus-when-possible t
-  "When t and .zeus.sock is present, run specs with 'zeus'."
+  "When t and .zeus.sock is present, run specs with `zeus'."
   :type 'boolean
   :group 'rspec-mode)
 
 (defcustom rspec-use-spring-when-possible t
-  "When t and spring.pid is present, run specs with 'spring'."
+  "When t and spring.pid is present, run specs with `spring'."
   :type 'boolean
   :group 'rspec-mode)
 
@@ -216,6 +266,13 @@ there's an `include FactoryGirl::Syntax::Methods' statement in spec_helper."
           (const nil))
   :group 'rspec-mode)
 
+(defcustom rspec-factory-gem 'factory-girl
+  "Defines whether to use the FactoryGirl or FactoryBot module in snippets."
+  :type '(choice
+          (const factory-girl)
+          (const factory-bot))
+  :group 'rspec-mode)
+
 (defcustom rspec-compilation-skip-threshold 2
   "Compilation motion commands skip less important messages.
 The value can be either 2 -- skip anything less than error, 1 --
@@ -228,14 +285,14 @@ info, are considered errors."
   :group 'rspec-mode)
 
 (defcustom rspec-expose-dsl-globally nil
-  "Defines whether the RSpec DSL is assumed to be exposed
-  globally, and so prepend snippets at the top level with
-  'RSpec.'."
+  "Defines whether the RSpec DSL is assumed to be exposed globally.
+If t, prepend snippets at the top level with `RSpec.'."
   :type 'boolean
   :group 'rspec-mode)
 
 (defcustom rspec-primary-source-dirs '("app" "lib")
-  "List of directories whose names should be omitted when looking
+  "Suppression list when searching for spec files.
+List of directories whose names should be omitted when looking
 for spec files corresponding to files inside them."
   :type '(repeat string)
   :safe 'listp
@@ -248,6 +305,27 @@ for spec files corresponding to files inside them."
   :type 'boolean
   :group 'rspec-mode)
 
+(defcustom rspec-after-verification-hook nil
+  "Hooks run after `rspec-verify' and its variants.
+They execute after failures have been stored in `rspec-last-failed-specs'."
+  :type 'hook
+  :group 'rspec-mode)
+
+(defcustom rspec-before-verification-hook nil
+  "Hooks run before `rspec-verify' and its variants."
+  :type 'hook
+  :group 'rspec-mode)
+
+(defcustom rspec-allow-multiple-compilation-buffers nil
+  "If t allows multiple RSpec to run in distinct compilation
+buffers concurrently"
+  :type 'boolean
+  :group 'rspec-mode)
+
+(declare-function yas-activate-extra-mode "yasnippet" (mode))
+(declare-function yas-deactivate-extra-mode "yasnippet" (mode))
+(declare-function yas-load-directory "yasnippet" (top-level-dir &optional use-jit interactive))
+
 ;;;###autoload
 (define-minor-mode rspec-mode
   "Minor mode for RSpec files
@@ -257,17 +335,12 @@ for spec files corresponding to files inside them."
   (if rspec-mode
       (progn
         (rspec-set-imenu-generic-expression)
-        (when (boundp 'yas-extra-modes)
-          (if (fboundp 'yas-activate-extra-mode)
-              ;; Yasnippet 0.8.1+
-              (yas-activate-extra-mode 'rspec-mode)
-            (make-local-variable 'yas-extra-modes)
-            (add-to-list 'yas-extra-modes 'rspec-mode)
-            (yas--load-pending-jits))))
+        (when (fboundp 'yas-activate-extra-mode)
+          (yas-activate-extra-mode 'rspec-mode)))
     (setq imenu-create-index-function 'ruby-imenu-create-index)
     (setq imenu-generic-expression nil)
-    (when (boundp 'yas-extra-modes)
-      (setq yas-extra-modes (delq 'rspec-mode yas-extra-modes)))))
+    (when (fboundp 'yas-deactivate-extra-mode)
+      (yas-deactivate-extra-mode 'rspec-mode))))
 
 ;;;###autoload
 (define-minor-mode rspec-verifiable-mode
@@ -284,7 +357,8 @@ for spec files corresponding to files inside them."
   :lighter "" :keymap `((,rspec-key-command-prefix . rspec-dired-mode-keymap)))
 
 (defconst rspec-imenu-generic-expression
-  '(("Examples"  "^\\( *\\(its?\\|specify\\|example\\|describe\\|context\\|feature\\|scenario\\) +.+\\)" 1))
+  '(("Methods" "^\\s *def\\s +\\([^\(\n; ]+\\)" 1)
+    ("Examples" "^\\( *\\(its?\\|specify\\|example\\|describe\\|context\\|feature\\|scenario\\) +.+\\)" 1))
   "The imenu regex to parse an outline of the rspec file")
 
 (defconst rspec-spec-file-name-re "\\(_\\|-\\)spec\\.rb\\'"
@@ -304,6 +378,7 @@ for spec files corresponding to files inside them."
 (defun rspec-install-snippets ()
   "Add `rspec-snippets-dir' to `yas-snippet-dirs' and load snippets from it."
   (require 'yasnippet)
+  (defvar yas-snippet-dirs)
   (add-to-list 'yas-snippet-dirs rspec-snippets-dir t)
   (yas-load-directory rspec-snippets-dir))
 
@@ -316,6 +391,15 @@ for spec files corresponding to files inside them."
     (dolist (rule rules)
       (setq class (replace-regexp-in-string (car rule) (cdr rule) class t t)))
     class))
+
+(defun rspec-type-from-file-name ()
+  "Guess the type of the spec is for."
+  (let* ((name (file-relative-name (buffer-file-name)
+                                   (rspec-spec-directory (buffer-file-name))))
+         (rules `(("/.*" . "") ("s$" . ""))))
+    (dolist (rule rules)
+      (setq name (replace-regexp-in-string (car rule) (cdr rule) name)))
+    name))
 
 (defun rspec-top-level-desc-p ()
   "Return t if point is on the first \"describe\" block opener."
@@ -384,11 +468,15 @@ for spec files corresponding to files inside them."
                          (rspec-core-options)))
 
 (defun rspec-verify-matching ()
-  "Run the specs related to the current buffer. This is more fuzzy that a simple verify."
+  "Run the specs related to the current buffer.
+This is more fuzzy that a simple verify."
   (interactive)
   (rspec--autosave-buffer-maybe)
   (rspec-run-multiple-files (rspec-all-related-spec-files (buffer-file-name))
                             (rspec-core-options)))
+
+(defvar rspec-last-failed-specs nil
+  "The file and line number of the specs that failed during the last run.")
 
 (defun rspec-run-last-failed ()
   "Run just the specs that failed during the last invocation."
@@ -422,6 +510,9 @@ in long-running test suites."
       (number-to-string (line-number-at-pos))))
    (rspec-core-options)))
 
+(declare-function dired-current-directory "dired")
+(declare-function dired-get-marked-files "dired")
+
 (defun rspec-dired-verify ()
   "Run all specs in the current directory."
   (interactive)
@@ -430,11 +521,11 @@ in long-running test suites."
 (defun rspec-dired-verify-single ()
   "Run marked specs or spec at point (works with directories too)."
   (interactive)
-  (rspec-compile (rspec-runner-target (dired-get-marked-files))
+  (rspec-compile (dired-get-marked-files)
                  (rspec-core-options)))
 
 (defun rspec-verify-all ()
-  "Run the 'spec' rake task for the project of the current file."
+  "Run the `spec' rake task for the project of the current file."
   (interactive)
   (rspec-run (rspec-core-options)))
 
@@ -529,7 +620,7 @@ to navigate to the example or method corresponding to point."
   "Find the target for A-SPEC-FILE-NAME."
   (cl-loop for extension in (list "rb" "rake")
            for candidate = (rspec-targetize-file-name a-spec-file-name
-                                                       extension)
+                                                      extension)
            for filename = (cl-loop for dir in (cons "."
                                                     rspec-primary-source-dirs)
                                    for target = (replace-regexp-in-string
@@ -622,7 +713,7 @@ file if it exists, or sensible defaults otherwise."
 
 (defun rspec-docker-p ()
   (and rspec-use-docker-when-possible
-       (file-readable-p (concat (rspec-project-root) "Dockerfile"))))
+       (file-readable-p (concat (rspec-project-root) rspec-docker-file-name))))
 
 (defun rspec-vagrant-p ()
   (and rspec-use-vagrant-when-possible
@@ -676,6 +767,7 @@ file if it exists, or sensible defaults otherwise."
         (vagrant (rspec-vagrant-p)))
     (shell-quote-argument
      (cond
+      (rspec-use-relative-path (file-relative-name file (rspec-project-root)))
       (remote (substring file (length remote)))
       (docker (replace-regexp-in-string (regexp-quote (rspec-project-root))
                                          rspec-docker-cwd file))
@@ -683,12 +775,16 @@ file if it exists, or sensible defaults otherwise."
                                          rspec-vagrant-cwd file))
       (t  file)))))
 
+(defun rspec--docker-default-wrapper (docker-command docker-container command)
+  "Function for wrapping a command for execution inside a dockerized environment. "
+  (format "%s %s sh -c \"%s\"" docker-command docker-container command))
+
 (defun rspec--docker-wrapper (command)
   (if (rspec-docker-p)
-      (format "%s %s bash -c \"%s\""
-              rspec-docker-command
-              rspec-docker-container
-              command)
+      (funcall rspec-docker-wrapper-fn
+               rspec-docker-command
+               rspec-docker-container
+               command)
     command))
 
 (defun rspec--vagrant-wrapper (command)
@@ -722,15 +818,15 @@ file if it exists, or sensible defaults otherwise."
   "Processes TARGET to pass it to the runner.
 TARGET can be a file, a directory, a list of such,
 or a cons (FILE . LINE), to run one example."
-  (let ((use-rake (rspec-rake-p)))
+  (let ((use-rake (rspec-compile-target-use-rake target))
+        (specs (rspec-compile-target-specs target)))
     (concat (when use-rake "SPEC=\'")
-            (if (listp target)
-                (if (listp (cdr target))
-                    (mapconcat #'rspec--shell-quote-local target " ")
-                  (concat (rspec--shell-quote-local (car target))
-                          ":"
-                          (cdr target)))
-              (rspec--shell-quote-local target))
+            (mapconcat (lambda (s)
+                         (concat (rspec--shell-quote-local (car s))
+                                 (and (cdr s)
+                                      (concat ":" (cdr s)))))
+                       specs
+                       " ")
             (when use-rake "\'"))))
 
 ;;;###autoload
@@ -741,28 +837,27 @@ or a cons (FILE . LINE), to run one example."
 
 (defun rspec-run (&optional opts)
   "Run spec with the specified options OPTS."
-  (rspec-compile (rspec-runner-target
-                  (rspec-spec-directory (rspec-project-root)))
+  (rspec-compile (rspec-spec-directory (rspec-project-root))
                  opts))
 
 (defun rspec-run-single-file (spec-file &rest opts)
   "Run spec on SPEC-FILE with the specified options OPTS."
-  (rspec-compile (rspec-runner-target spec-file) opts))
+  (rspec-compile spec-file opts))
 
 (defun rspec-run-multiple-files (spec-files &rest opts)
   "Run spec on a list of SPEC-FILES with the specified options OPTS."
   (if (null spec-files)
       (message "No spec files found!")
-    (rspec-compile (rspec-runner-target spec-files) opts)))
-
-(defvar rspec-last-failed-specs nil
-  "The file and line number of the specs that failed during the last run.")
+    (rspec-compile spec-files opts)))
 
 (defvar rspec-last-directory nil
   "Directory the last spec process ran in.")
 
 (defvar rspec-last-arguments nil
   "Arguments passed to `rspec-compile' at the last invocation.")
+
+(cl-defstruct rspec-compile-target
+  use-rake specs directory)
 
 (defun rspec-rerun ()
   "Re-run the last RSpec invocation."
@@ -772,21 +867,61 @@ or a cons (FILE . LINE), to run one example."
     (let ((default-directory rspec-last-directory))
       (apply #'rspec-compile rspec-last-arguments))))
 
+(defun rspec-yank-last-command ()
+  "Yank the last RSpec command to the clipboard."
+  (interactive)
+  (if (not rspec-last-directory)
+      (error "No previous verification")
+    (let ((default-directory rspec-last-directory))
+      (kill-new (apply #'rspec-compile-command rspec-last-arguments)))))
+
+(declare-function rvm-activate-corresponding-ruby nil)
+(declare-function chruby-use-corresponding nil)
+
 (defun rspec-compile (target &optional opts)
   "Run a compile for TARGET with the specified options OPTS."
-  (setq rspec-last-directory default-directory
-        rspec-last-arguments (list target opts))
+  (let ((compile-target (rspec-make-rspec-compile-target target)))
+    (setq rspec-last-directory default-directory
+          rspec-last-arguments (list compile-target opts))
 
-  (if rspec-use-rvm
-      (rvm-activate-corresponding-ruby))
+    (if rspec-use-rvm
+        (rvm-activate-corresponding-ruby))
 
-  (let ((default-directory (or (rspec-project-root) default-directory)))
-    (compile (rspec--vagrant-wrapper
-              (rspec--docker-wrapper
-               (mapconcat 'identity `(,(rspec-runner)
-                                     ,(rspec-runner-options opts)
-                                     ,target) " ")))
-             'rspec-compilation-mode)))
+    (if rspec-use-chruby
+        (chruby-use-corresponding))
+
+    (let ((default-directory (or (rspec-project-root) default-directory))
+          (compilation-buffer-name-function (and rspec-allow-multiple-compilation-buffers
+                                                 'rspec-compilation-buffer-name))
+          (process-environment (cons "RUBY_DEBUG_NO_RELINE=true"
+                                     process-environment)))
+      (setf (rspec-compile-target-directory compile-target) default-directory)
+      (compile
+       (rspec-compile-command compile-target opts)
+       'rspec-compilation-mode))))
+
+(defun rspec-make-rspec-compile-target (target)
+  "Processes TARGET to pass it to the runner.
+TARGET can be a file, a directory, a list of such,
+or a cons (FILE . LINE), to run one example."
+  (if (rspec-compile-target-p target)
+      target
+    (make-rspec-compile-target
+     :use-rake (rspec-rake-p)
+     :specs (cond ((and (listp target) (listp (cdr target)))
+                   (mapcar (lambda (f) (list f)) target))
+                  ((listp target)
+                   (list target))
+                  (t
+                   (list (list target)))))))
+
+(defun rspec-compile-command (target &optional opts)
+  "Composes RSpec command line for the compile function"
+  (rspec--vagrant-wrapper
+    (rspec--docker-wrapper
+    (mapconcat 'identity `(,(rspec-runner)
+                            ,(rspec-runner-options opts)
+                            ,(rspec-runner-target target)) " "))))
 
 (defvar rspec-compilation-mode-font-lock-keywords
   '((compilation--ensure-parse)
@@ -798,8 +933,8 @@ or a cons (FILE . LINE), to run one example."
      (1 compilation-error-face))))
 
 (defvar rspec-compilation-error-regexp-alist-alist
-  '((rspec-capybara-html "screenshot: file://\\([0-9A-Za-z@_./\:-]+\\.html\\)" 1 nil nil 0 1)
-    (rspec-capybara-screenshot "screenshot: file://\\([0-9A-Za-z@_./\:-]+\\.png\\)" 1 nil nil 0 1)
+  '((rspec-capybara-html "^ +HTML screenshot: \\([0-9A-Za-z@_./\:-]+\\.html\\)" 1 nil nil 0 1)
+    (rspec-capybara-screenshot "^ +\\(Image \\)?\\[?[sS]creenshot\\]?: \\(.+\\.png\\)" 2 nil nil 0 2)
     (rspec "^ +# \\([0-9A-Za-z@_./:-]+\\.rb\\):\\([0-9]+\\):in" 1 2 nil 2 1)
     (rspec-pendings "^ +# \\([0-9A-Za-z@_./:-]+\\.rb\\):\\([0-9]+\\)" 1 2 nil 1 1)
     (rspec-summary "^rspec \\([0-9A-Za-z@_./:-]+\\.rb\\):\\([0-9]+\\)" 1 2 nil 2 1)))
@@ -809,11 +944,13 @@ or a cons (FILE . LINE), to run one example."
 
 (define-compilation-mode rspec-compilation-mode "RSpec Compilation"
   "Compilation mode for RSpec output."
+  (add-hook 'compilation-start-hook 'rspec-run-before-verification-hooks nil t)
   (add-hook 'compilation-filter-hook 'rspec-colorize-compilation-buffer nil t)
   (add-hook 'compilation-finish-functions 'rspec-store-failures nil t)
-  (add-hook 'compilation-finish-functions 'rspec-handle-error nil t))
+  (add-hook 'compilation-finish-functions 'rspec-handle-error nil t)
+  (add-hook 'compilation-finish-functions 'rspec-run-after-verification-hooks t t))
 
-(defun rspec-store-failures (&rest ignore)
+(defun rspec-store-failures (&rest _)
   "Store the file and line number of the failed examples from this run."
   (let (failures)
     (save-excursion
@@ -823,11 +960,9 @@ or a cons (FILE . LINE), to run one example."
     (setq rspec-last-failed-specs (reverse failures))))
 
 (defun rspec-colorize-compilation-buffer ()
-  (toggle-read-only)
-  (ansi-color-apply-on-region compilation-filter-start (point))
-  (toggle-read-only))
+  (ansi-color-apply-on-region compilation-filter-start (point)))
 
-(defun rspec-handle-error (&rest ignore)
+(defun rspec-handle-error (&rest _)
   (save-excursion
     (goto-char (point-max))
     (when (save-excursion
@@ -844,18 +979,37 @@ or a cons (FILE . LINE), to run one example."
         (insert-text-button url 'type 'help-url 'help-args (list url))
         (insert ".\n")))))
 
+(defun rspec-run-after-verification-hooks (&rest _)
+  "Executes any functions in `rspec-after-verification-hook'"
+  (run-hooks 'rspec-after-verification-hook))
+
+(defun rspec-run-before-verification-hooks (&rest _)
+  "Executes any functions in `rspec-before-verification-hook'"
+  (run-hooks 'rspec-before-verification-hook))
+
+(defun rspec-project-root-directory-p (directory)
+  (or (file-regular-p (expand-file-name "Rakefile" directory))
+      (file-regular-p (expand-file-name "Gemfile" directory))
+      (file-regular-p (expand-file-name "Berksfile" directory))))
+
 (defun rspec-project-root (&optional directory)
-  "Finds the root directory of the project by walking the directory tree until it finds a rake file."
+  "Find the root directory of the project.
+Walk the directory tree until it finds a rake file."
   (let ((directory (file-name-as-directory (or directory default-directory))))
     (cond ((rspec-root-directory-p directory)
            (error "Could not determine the project root."))
-          ((file-exists-p (expand-file-name "Rakefile" directory)) directory)
-          ((file-exists-p (expand-file-name "Gemfile" directory)) directory)
-          ((file-exists-p (expand-file-name "Berksfile" directory)) directory)
+          ((rspec-project-root-directory-p directory) (expand-file-name directory))
           (t (rspec-project-root (file-name-directory (directory-file-name directory)))))))
 
+(defun rspec--factory-girl-module-name ()
+  (if (eq rspec-factory-gem 'factory-bot)
+      "FactoryBot"
+    "FactoryGirl"))
+
 (defun rspec--include-fg-syntax-methods-p ()
-  "Check whether FactoryGirl::Syntax::Methods is included in rails_helper or spec_helper."
+  "Check if FactoryGirl is available.
+Check whether FactoryGirl::Syntax::Methods is included
+in rails_helper or spec_helper."
   (cl-case rspec-snippets-fg-syntax
     (full nil)
     (concise t)
@@ -867,14 +1021,14 @@ or a cons (FILE . LINE), to run one example."
             (with-temp-buffer
               (insert-file-contents expanded-path)
               (ruby-mode)
-              (when (re-search-forward "include +FactoryGirl::Syntax::Methods" nil t)
+              (when (re-search-forward (concat "include +" (rspec--factory-girl-module-name) "::Syntax::Methods") nil t)
                 (not (nth 4 (syntax-ppss))))))))
       '("spec/rails_helper.rb" "spec/spec_helper.rb")))))
 
 (defun rspec--autosave-buffer-maybe ()
   "Saves the current buffer if `rspec-autosave-buffer' is t and
 the buffer is a spec or a target file."
-  (when (and rspec-autosave-buffer (rspec-spec-or-target))
+  (when rspec-autosave-buffer
     (save-buffer)))
 
 (defun rspec-snippets-fg-method-call (method)
@@ -882,7 +1036,84 @@ the buffer is a spec or a target file."
 Looks at FactoryGirl::Syntax::Methods usage in spec_helper."
   (if (rspec--include-fg-syntax-methods-p)
       method
-    (concat "FactoryGirl." method)))
+    (concat (rspec--factory-girl-module-name) "." method)))
+
+(defun rspec-parse-runner-target (target)
+  "Parses the `rspec-runner-target' string"
+  (when (string= "SPEC=\'" (cl-subseq target 0 6))
+    ;; Removes SPEC=' prefix and ' suffix
+    (setq target (cl-subseq target 6 (1- (length target)))))
+  (mapcar (lambda (s) (split-string s ":"))
+          (split-string target " ")))
+
+(defun rspec-compile-target-first-spec-file (target)
+  (let ((file (caar (rspec-compile-target-specs target))))
+    (and (rspec-spec-file-p file) file)))
+
+(defun rspec-compile-target-first-spec-filename (target)
+  (let ((spec-filepath (caar (rspec-compile-target-specs target))))
+    (and (rspec-spec-file-p spec-filepath)
+         (file-name-sans-extension
+          (file-name-nondirectory spec-filepath)))))
+
+(defun rspec-compile-target-project-name (target)
+  (let ((directory (rspec-compile-target-directory target)))
+    (and (rspec-project-root-directory-p directory)
+         (file-name-nondirectory (directory-file-name directory)))))
+
+(defconst rspec-compilation-buffer-name-base "*rspec-compilation*")
+
+(defun rspec-compilation-buffer-name-with (suffix)
+  (format (concat rspec-compilation-buffer-name-base " <%s>") suffix))
+
+(defun rspec-compilation-buffer-name-with-spec-file-name (target)
+  (let ((spec-filename (rspec-compile-target-first-spec-filename target)))
+    (and spec-filename
+         (rspec-compilation-buffer-name-with (file-name-sans-extension spec-filename)))))
+
+(defun rspec-compilation-buffer-name-with-project-name (target)
+  (let ((project-name (rspec-compile-target-project-name target)))
+    (and project-name
+         (rspec-compilation-buffer-name-with project-name))))
+
+(defun rspec-compilation-buffer-name-with-spec-and-project-name (target)
+  (let ((spec-filename (rspec-compile-target-first-spec-filename target))
+        (project-name (rspec-compile-target-project-name target)))
+    (and spec-filename
+         project-name
+         (rspec-compilation-buffer-name-with
+          (concat project-name "/" (file-name-sans-extension spec-filename))))))
+
+(defun rspec-compilation-buffer-name-with-spec-and-project-path (target)
+  (let ((spec-filepath (caar (rspec-compile-target-specs target)))
+        (project-name (rspec-compile-target-project-name target)))
+    (and project-name
+         (rspec-compilation-buffer-name-with
+          (concat project-name "/" (file-name-sans-extension
+                                    (rspec-compress-spec-file spec-filepath)))))))
+
+(defun rspec-compilation-buffer-name-candidates ()
+  (let ((target (car rspec-last-arguments))
+        candidates)
+    (cl-flet ((choose (name)
+                      (when name
+                        (push name candidates))))
+      (choose rspec-compilation-buffer-name-base)
+      (choose (rspec-compilation-buffer-name-with-spec-file-name target))
+      (choose (rspec-compilation-buffer-name-with-project-name target))
+      (choose (rspec-compilation-buffer-name-with-spec-and-project-name target))
+      (choose (rspec-compilation-buffer-name-with-spec-and-project-path target))
+      (nreverse candidates))))
+
+(defun rspec-compilation-buffer-name (&rest _)
+  "Determines the buffer name of the current rspec compilation"
+  (let* ((candidates (rspec-compilation-buffer-name-candidates))
+         (first-candidate (car candidates)))
+    (or (cl-find-if (lambda (buffer-name-candidate)
+                      (let ((process (get-buffer-process buffer-name-candidate)))
+                        (not (process-live-p process))))
+                    candidates)
+        first-candidate)))
 
 ;;;###autoload
 (defun rspec-enable-appropriate-mode ()
@@ -892,7 +1123,7 @@ Looks at FactoryGirl::Syntax::Methods usage in spec_helper."
 
 ;; Hook up all Ruby buffers.
 ;;;###autoload
-(dolist (hook '(ruby-mode-hook enh-ruby-mode-hook))
+(dolist (hook '(ruby-mode-hook ruby-ts-mode-hook enh-ruby-mode-hook))
   (add-hook hook 'rspec-enable-appropriate-mode))
 
 ;; Add verify related spec keybinding to rails minor mode buffers

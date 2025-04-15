@@ -5,7 +5,7 @@ Lots of modes and shortcuts to code in emacs fast and -fun- furious.
 
 ## C-c Install
 
-Make a symbolic link:
+Make a symbolic link (recommended):
 
     git clone git://github.com/fireho/emacx
     cd emacx && ln -s `pwd`/.emacs.d ~/.emacs.d
@@ -96,10 +96,3 @@ Inicie pelo tutorial incluso no Editor, em Help => Emacs Tutorial
 ## Emacs é somente para nerds e é muito díficil, o que devo fazer?
 
 Por favor, verifique o manual para preguiçosos do mesmo em /dev/null.
-
-
-## Desenvolvedores
-
-
-Melhorias/correções:
-Fork! E ñ exite em mandar um 'pull request'.
