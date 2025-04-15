@@ -1,4 +1,6 @@
-;;; Emacxx --- Emacs custom configs
+;;; Emacxx --- Emacs custom config
+;;;
+;;; Commentary:
 ;;;
 ;;;
 ;;; Emacs for fun and profit !!
@@ -31,7 +33,7 @@
 ;;    M-t     'ido-find-file
 ;;    M-p     'projectile-switch-project
 ;;    M-f     'projectile-find-file
-;;    M-q     'kill-this-buffer
+;;    M-q     'kill-current-buffer
 ;;    M-r     'query-replace
 ;;    M-w     'ido-switch-buffer
 ;;    M-W     'bookmark-jump
@@ -69,8 +71,8 @@
 (setq-default truncate-lines t)
 ;;(setq warning-minimum-level :error)
 (setq truncate-partial-width-windows nil) ;; for vertically-split windows
-(setq x-select-enable-clipboard t) ;; make emacs use the clipboard
-(global-linum-mode)
+(setq select-enable-clipboard t) ;; make emacs use the clipboard
+(global-display-line-numbers-mode 1)
 
 (defalias 'yes-or-no-p 'y-or-n-p)
 (prefer-coding-system 'utf-8)
@@ -92,9 +94,18 @@
 ;;       kept-old-versions 2
 ;;       version-control t)
 
-(projectile-global-mode)
+(projectile-mode)
 (setq projectile-indexing-method 'native)
 (setq projectile-enable-caching t)
+
+(defun my-minibuffer-setup-hook ()
+  (setq gc-cons-threshold most-positive-fixnum))
+
+(defun my-minibuffer-exit-hook ()
+  (setq gc-cons-threshold 800000))
+
+(add-hook 'minibuffer-setup-hook #'my-minibuffer-setup-hook)
+(add-hook 'minibuffer-exit-hook #'my-minibuffer-exit-hook)
 
 (add-hook 'after-init-hook #'global-flycheck-mode)
 
@@ -121,7 +132,7 @@
 (require 'whitespace)
 (setq whitespace-style '(face empty tabs lines-tail trailing space-before-tab))
 (global-whitespace-mode t)
-(powerline-default-theme)
+;; (powerline-default-theme)
 ;; (setq whitespace-line-count 80 whitespace-style '(lines))
 ;; '(whitespace-global-modes (quote (ruby-mode emacs-lisp-mode scheme-mode enh-ruby-mode c-mode racket-mode sml-mode)))
 
@@ -137,8 +148,8 @@
 (require 'slim-mode)
 (require 'haml-mode)
 (require 'sass-mode)
-(require 'scss-mode)
-(require 'less-css-mode)
+;;(require 'scss-mode)
+;;(require 'less-css-mode)
 
 (require 'yasnippet)
 (setq yas-snippet-dirs '("~/.emacs.d/snippets"))
@@ -271,20 +282,20 @@
 
 
 ;; work around magit key changes
-(eval-after-load 'magit-mode
-  '(progn
-     (define-key magit-mode-map (kbd "M-w") 'ido-switch-buffer)))
+;; (eval-after-load 'magit-mode
+;;   '(progn
+;;      (define-key magit-mode-map (kbd "M-w") 'ido-switch-buffer)))
 
 ;; (global-set-key (kbd "C-h r") 'ri)
 ;; We never want to edit Rubinius bytecode
 (add-to-list 'completion-ignored-extensions ".rbc")
 
 ;; Require REl
-(add-hook 'ruby-mode-hook
-          (lambda()
-            (require 'ruby-electric)
-            (ruby-electric-mode t)
-            ))
+;; (add-hook 'ruby-mode-hook
+;;           (lambda()
+;;             (require 'ruby-electric)
+;;             (ruby-electric-mode t)
+;;             ))
 
 
 ;;
@@ -310,10 +321,12 @@
     (delete-trailing-whitespace)))
 
 
+(add-hook 'python-mode-hook 'progmodes-hooks)
 (add-hook 'ruby-mode-hook 'progmodes-hooks)
 (add-hook 'haml-mode-hook 'progmodes-hooks)
 (add-hook 'sass-mode-hook 'progmodes-hooks)
-(add-hook 'js2-mode-hook 'progmodes-hooks)
+(add-hook 'js-mode-hook 'progmodes-hooks)
+(add-hook 'vue-mode-hook 'progmodes-hooks)
 
 ;; ;; Law & Order
 ;; (require 'rubocop)
@@ -353,16 +366,18 @@
  '(blink-cursor-mode nil)
  '(debug-on-error nil)
  '(display-time-mode t)
- '(fset (quote yes-or-no-p) t)
+ '(fset 'yes-or-no-p t)
  '(inhibit-startup-screen t)
  '(menu-bar-mode nil)
  '(package-selected-packages
-	 (quote
-		(coffee-mode haml-mode rubocop rainbow-mode projectile powerline paradox magit google-translate git-timemachine flycheck flx-ido findr elixir-mode auto-complete)))
+   '(## auto-complete coffee-mode copilot dumb-jump elixir-mode findr
+        flx-ido flycheck git-timemachine google-translate gptel
+        haml-mode magit paradox powerline projectile rainbow-mode
+        rubocop vue-mode))
  '(rails-indent-and-complete nil)
- '(safe-local-variable-values (quote ((encoding . utf-8))))
- '(save-abbrevs (quote silently))
- '(scroll-bar-mode (quote right))
+ '(safe-local-variable-values '((encoding . utf-8)))
+ '(save-abbrevs 'silently)
+ '(scroll-bar-mode 'right)
  '(show-paren-mode t)
  '(tool-bar-mode nil)
  '(tooltip-mode nil))
@@ -429,14 +444,14 @@
 (transient-mark-mode 1) ;; No region when it is not highlighted
 (setq cua-keep-region-after-copy t)
 
-(defadvice align (around smart-tabs activate)
-  (let ((indent-tabs-mode nil)) ad-do-it))
+;; (define-advice align (around smart-tabs activate)
+;;   (let ((indent-tabs-mode nil)) ad-do-it))
 
-(defadvice align-regexp (around smart-tabs activate)
-  (let ((indent-tabs-mode nil)) ad-do-it))
+;; (define-advice align-regexp (around smart-tabs activate)
+;;   (let ((indent-tabs-mode nil)) ad-do-it))
 
-(defadvice indent-relative (around smart-tabs activate)
-  (let ((indent-tabs-mode nil)) ad-do-it))
+;; (define-advice indent-relative (around smart-tabs activate)
+;;   (let ((indent-tabs-mode nil)) ad-do-it))
 
 (setq vhdl-indent-tabs-mode t)
 
@@ -447,12 +462,13 @@
   (save-some-buffers 1))
 
 ;; Save on switch buffer
-(defadvice switch-to-buffer (before save-buffer-now activate)
-  (when buffer-file-name (save-buffer)))
-(defadvice other-window (before other-window-now activate)
-  (when buffer-file-name (save-buffer)))
-(defadvice other-frame (before other-frame-now activate)
-  (when buffer-file-name (save-buffer)))
+;;(defun save-buffer-if-file-name ()
+;;  "Save the current buffer if it has a file name."
+;;  (when buffer-file-name
+;;    (save-buffer)))
+;;(advice-add 'switch-to-buffer :before #'save-buffer-if-file-name)
+;;(advice-add 'other-window :before #'save-buffer-if-file-name)
+;;(advice-add 'other-frame :before #'save-buffer-if-file-name)
 
 
 (add-hook 'deselect-frame-hook 'dld-deselect-frame-hook)
@@ -486,7 +502,6 @@
 (global-set-key "\M-t" 'ido-find-file)
 (global-set-key "\M-p" 'projectile-switch-project)
 (global-set-key "\M-f" 'projectile-find-file)
-(global-set-key "\M-q" 'kill-this-buffer)
 (global-set-key "\M-r" 'query-replace)
 (global-set-key "\M-w" 'ido-switch-buffer)
 (global-set-key "\M-W" 'bookmark-jump)
@@ -554,21 +569,13 @@
 (add-to-list 'ac-modes 'ruby-mode)
 
 
-;; Remap selfish modes...
-(eval-after-load 'cc-mode
-  '(progn
-     (define-key c++-mode-map (kbd "M-q") 'kill-this-buffer)
-     (define-key c++-mode-map (kbd "M-a") 'magit-status)
-     (define-key c-mode-map (kbd "M-q") 'kill-this-buffer)
-     (define-key c-mode-map (kbd "M-a") 'magit-status)))
-
 ;;
 ;; Le Font Face
 ;;
 ;; Monaco Inconsolata Hack
 ;;
-(set-face-attribute 'default nil :font  "Inconsolata-17" )
-(set-frame-font   "Inconsolata-17" nil t)
+(set-face-attribute 'default nil :font  "Hack Nerd Font Mono-14" )
+(set-frame-font   "Hack Nerd Font Mono-14" nil t)
 
 
 (let ((path (shell-command-to-string ". ~/.zshrc; echo -n $PATH")))
@@ -579,10 +586,10 @@
          exec-path)))
 
 
-(eval-after-load 'mumamo
-  '(progn
-     (define-key mumamo-map (kbd "M-q") 'kill-this-buffer)
-     (define-key mumamo-map (kbd "M-a") 'magit-status)))
+;; (eval-after-load 'mumamo
+;;   '(progn
+;;      (define-key mumamo-map (kbd "M-q") 'kill-this-buffer)
+;;      (define-key mumamo-map (kbd "M-a") 'magit-status)))
 
 (message "Good work!")
 (custom-set-faces
@@ -591,3 +598,25 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  )
+(put 'downcase-region 'disabled nil)
+
+
+(defvar my-keys-minor-mode-map (make-sparse-keymap)
+  "Keymap for my custom keybindings.")
+
+(define-minor-mode my-keys-minor-mode
+  "A minor mode to override other keymaps."
+  :init-value t
+  :lighter " MyKeys"
+  :keymap my-keys-minor-mode-map)
+
+;; Add your custom keybindings here
+(define-key my-keys-minor-mode-map (kbd "M-q") 'kill-current-buffer)
+
+;; Ensure the minor mode is always active
+(my-keys-minor-mode 1)
+
+;; OPTIONAL configuration gptel-model 'claude-3.7-sonnet
+(setq gptel-backend (gptel-make-gh-copilot "Copilot"))
+
+;;; init.el ends here
